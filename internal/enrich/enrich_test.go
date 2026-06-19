@@ -2,6 +2,7 @@ package enrich
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -83,8 +84,7 @@ func TestOpenLibraryByISBNParses(t *testing.T) {
 
 func TestHardcoverSearchTopParses(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		buf := make([]byte, r.ContentLength)
-		r.Body.Read(buf)
+		buf, _ := io.ReadAll(r.Body)
 		if strings.Contains(string(buf), "SearchBooks") {
 			w.Write([]byte(`{"data":{"search":{"ids":[42]}}}`))
 			return

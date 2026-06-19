@@ -137,7 +137,10 @@ func (h *Hardcover) byID(ctx context.Context, id int) (bookmeta.Book, error) {
 }
 
 func (h *Hardcover) do(ctx context.Context, query string, vars map[string]any, out any) error {
-	body, _ := json.Marshal(map[string]any{"query": query, "variables": vars})
+	body, err := json.Marshal(map[string]any{"query": query, "variables": vars})
+	if err != nil {
+		return err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, h.url, bytes.NewReader(body))
 	if err != nil {
 		return err
