@@ -89,7 +89,9 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 		CoverURL:    v.ImageLinks.Thumbnail,
 	}
 	if item.ID != "" {
-		b.GoogleURL = "https://books.google.com/books?id=" + item.ID
+		// new Google Books experience (classic books.google.com is being sunset);
+		// "_" is a slug placeholder Google expands to the canonical title.
+		b.GoogleURL = "https://www.google.com/books/edition/_/" + item.ID
 	}
 	if len(v.Authors) > 0 {
 		b.Author = v.Authors[0]
