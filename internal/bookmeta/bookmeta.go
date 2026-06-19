@@ -4,13 +4,19 @@ package bookmeta
 import "strings"
 
 type Book struct {
-	ISBN13      string `json:"isbn13,omitempty"`
-	Title       string `json:"title"`
-	Author      string `json:"author,omitempty"`
-	Publisher   string `json:"publisher,omitempty"`
-	WhyTrending string `json:"why_trending,omitempty"`
-	SourceURL   string `json:"source_url,omitempty"`
-	CoverURL    string `json:"cover_url,omitempty"`
+	ISBN13       string   `json:"isbn13,omitempty"`
+	Title        string   `json:"title"`
+	Author       string   `json:"author,omitempty"`
+	Publisher    string   `json:"publisher,omitempty"`
+	Description  string   `json:"description,omitempty"`
+	CoverURL     string   `json:"cover_url,omitempty"`
+	Subjects     []string `json:"subjects,omitempty"`
+	Series       string   `json:"series,omitempty"`
+	Rating       float64  `json:"rating,omitempty"`
+	RatingsCount int      `json:"ratings_count,omitempty"`
+	PageCount    int      `json:"page_count,omitempty"`
+	Year         int      `json:"year,omitempty"`
+	HardcoverURL string   `json:"hardcover_url,omitempty"`
 }
 
 func NormalizeISBN(s string) string {
@@ -33,4 +39,45 @@ func PlausibleISBN13(s string) bool {
 		}
 	}
 	return true
+}
+
+// Fill copies non-empty fields from src into dst where dst is empty/zero.
+func (dst *Book) Fill(src Book) {
+	if dst.ISBN13 == "" {
+		dst.ISBN13 = src.ISBN13
+	}
+	if dst.Title == "" {
+		dst.Title = src.Title
+	}
+	if dst.Author == "" {
+		dst.Author = src.Author
+	}
+	if dst.Publisher == "" {
+		dst.Publisher = src.Publisher
+	}
+	if dst.Description == "" {
+		dst.Description = src.Description
+	}
+	if dst.CoverURL == "" {
+		dst.CoverURL = src.CoverURL
+	}
+	if len(dst.Subjects) == 0 {
+		dst.Subjects = src.Subjects
+	}
+	if dst.Series == "" {
+		dst.Series = src.Series
+	}
+	if dst.Rating == 0 {
+		dst.Rating = src.Rating
+		dst.RatingsCount = src.RatingsCount
+	}
+	if dst.PageCount == 0 {
+		dst.PageCount = src.PageCount
+	}
+	if dst.Year == 0 {
+		dst.Year = src.Year
+	}
+	if dst.HardcoverURL == "" {
+		dst.HardcoverURL = src.HardcoverURL
+	}
 }
