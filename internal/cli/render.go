@@ -46,7 +46,7 @@ func renderBook(w io.Writer, b bookmeta.Book, asJSON bool) error {
 	}
 	if b.Description != "" {
 		fmt.Fprintln(w)
-		fmt.Fprintln(w, wrap(b.Description, 80))
+		fmt.Fprintln(w, paragraphs(b.Description, 80))
 	}
 	if b.HardcoverURL != "" {
 		fmt.Fprintln(w)
@@ -62,7 +62,18 @@ func trim(s []string, n int) []string {
 	return s
 }
 
-func wrap(s string, width int) string {
+// paragraphs wraps each paragraph to width, preserving blank lines between them.
+func paragraphs(s string, width int) string {
+	var out []string
+	for _, p := range strings.Split(s, "\n") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, wrapLine(p, width))
+		}
+	}
+	return strings.Join(out, "\n\n")
+}
+
+func wrapLine(s string, width int) string {
 	var out strings.Builder
 	line := 0
 	for i, word := range strings.Fields(s) {

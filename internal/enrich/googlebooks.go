@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/dungeonbooks/tools/internal/bookmeta"
 )
@@ -79,7 +82,7 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 	v := raw.Items[0].VolumeInfo
 	b := bookmeta.Book{
 		Title:        v.Title,
-		Description:  v.Description,
+		Description:  cleanHTML(v.Description),
 		Publisher:    v.Publisher,
 		PageCount:    v.PageCount,
 		Subjects:     v.Categories,
@@ -101,4 +104,16 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 		}
 	}
 	return b, nil
+}
+
+var (
+	htmlBreaks = regexp.MustCompile(`(?i)<br\s*/?>|</p>\s*<p>|</p>|<p>`)
+	htmlTags   = regexp.MustCompile(`<[^>]+>`)
+)
+
+// cleanHTML turns Google's HTML descriptions into plain text with paragraph breaks.
+func cleanHTML(s string) string {
+	s = htmlBreaks.ReplaceAllString(s, "\n")
+	s = htmlTags.ReplaceAllString(s, "")
+	return strings.TrimSpace(html.UnescapeString(s))
 }
