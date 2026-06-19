@@ -1,6 +1,10 @@
 package config
 
-import "os"
+import (
+	"os"
+
+	"github.com/joho/godotenv"
+)
 
 type Config struct {
 	Env            string
@@ -10,6 +14,7 @@ type Config struct {
 }
 
 func Load() Config {
+	_ = godotenv.Load() // best-effort: load .env if present; real env vars win
 	return Config{
 		Env:            env("ENV", "dev"),
 		ExaAPIKey:      os.Getenv("EXA_API_KEY"),
