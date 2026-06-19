@@ -26,7 +26,7 @@ func (r *ISBNResolver) Resolve(ctx context.Context, title, author string) (strin
 	if strings.TrimSpace(title) == "" {
 		return "", nil
 	}
-	q := url.Values{"title": {title}, "fields": {"isbn"}, "limit": {"1"}}
+	q := url.Values{"title": {title}, "fields": {"isbn"}, "limit": {"5"}}
 	if author != "" {
 		q.Set("author", author)
 	}

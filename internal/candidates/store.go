@@ -3,11 +3,21 @@ package candidates
 import (
 	"errors"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
 
 var ErrNotFound = errors.New("candidate not found")
+
+// dedupKey identifies a candidate by ISBN-13, or by normalized title+author
+// when no ISBN has been resolved, so re-discovery never duplicates a book.
+func dedupKey(c Candidate) string {
+	if c.ISBN13 != "" {
+		return "isbn:" + c.ISBN13
+	}
+	return "ta:" + strings.ToLower(strings.Join(strings.Fields(c.Title+" "+c.Author), " "))
+}
 
 // Store is an in-memory candidate store.
 type Store struct {
@@ -20,17 +30,20 @@ func NewStore() *Store {
 	return &Store{nextID: 1, byID: map[int64]Candidate{}}
 }
 
-// Upsert inserts a candidate, or updates an existing one with the same ISBN-13.
+// Upsert inserts a candidate, or refreshes an existing one with the same dedup
+// key, preserving its id, discovery time, and lifecycle (status, Ingram verdict).
 func (s *Store) Upsert(c Candidate) Candidate {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if c.ISBN13 != "" {
-		for id, existing := range s.byID {
-			if existing.ISBN13 == c.ISBN13 {
-				c.ID, c.DiscoveredAt = id, existing.DiscoveredAt
-				s.byID[id] = c
-				return c
-			}
+	k := dedupKey(c)
+	for id, existing := range s.byID {
+		if dedupKey(existing) == k {
+			c.ID = id
+			c.DiscoveredAt = existing.DiscoveredAt
+			c.Status = existing.Status
+			c.IngramStatus = existing.IngramStatus
+			s.byID[id] = c
+			return c
 		}
 	}
 	c.ID = s.nextID
