@@ -17,6 +17,7 @@ type Book struct {
 	PageCount    int      `json:"page_count,omitempty"`
 	Year         int      `json:"year,omitempty"`
 	HardcoverURL string   `json:"hardcover_url,omitempty"`
+	GoogleURL    string   `json:"google_url,omitempty"`
 }
 
 func NormalizeISBN(s string) string {
@@ -79,5 +80,8 @@ func (dst *Book) Fill(src Book) {
 	}
 	if dst.HardcoverURL == "" {
 		dst.HardcoverURL = src.HardcoverURL
+	}
+	if dst.GoogleURL == "" {
+		dst.GoogleURL = src.GoogleURL
 	}
 }

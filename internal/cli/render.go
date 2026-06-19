@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 
 	"github.com/dungeonbooks/tools/internal/bookmeta"
@@ -48,9 +49,18 @@ func renderBook(w io.Writer, b bookmeta.Book, asJSON bool) error {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, paragraphs(b.Description, 80))
 	}
+	var links []string
 	if b.HardcoverURL != "" {
+		links = append(links, "Hardcover: "+b.HardcoverURL)
+	}
+	if b.GoogleURL != "" {
+		links = append(links, "Google Books: "+b.GoogleURL)
+	}
+	if len(links) > 0 {
 		fmt.Fprintln(w)
-		fmt.Fprintln(w, "Hardcover: "+b.HardcoverURL)
+		for _, l := range links {
+			fmt.Fprintln(w, l)
+		}
 	}
 	return nil
 }
@@ -62,10 +72,13 @@ func trim(s []string, n int) []string {
 	return s
 }
 
-// paragraphs wraps each paragraph to width, preserving blank lines between them.
+var blankLine = regexp.MustCompile(`\n\s*\n`)
+
+// paragraphs wraps each paragraph to width, separated by a blank line. Paragraph
+// boundaries are blank lines; single newlines within a paragraph fold to spaces.
 func paragraphs(s string, width int) string {
 	var out []string
-	for _, p := range strings.Split(s, "\n") {
+	for _, p := range blankLine.Split(s, -1) {
 		if p = strings.TrimSpace(p); p != "" {
 			out = append(out, wrapLine(p, width))
 		}

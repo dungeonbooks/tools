@@ -41,6 +41,7 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 	}
 	var raw struct {
 		Items []struct {
+			ID         string `json:"id"`
 			VolumeInfo struct {
 				Title         string   `json:"title"`
 				Authors       []string `json:"authors"`
@@ -77,7 +78,8 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 	if len(raw.Items) == 0 {
 		return bookmeta.Book{}, nil
 	}
-	v := raw.Items[0].VolumeInfo
+	item := raw.Items[0]
+	v := item.VolumeInfo
 	b := bookmeta.Book{
 		Title:       v.Title,
 		Description: cleanHTML(v.Description),
@@ -85,6 +87,9 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 		PageCount:   v.PageCount,
 		Subjects:    v.Categories,
 		CoverURL:    v.ImageLinks.Thumbnail,
+	}
+	if item.ID != "" {
+		b.GoogleURL = "https://books.google.com/books?id=" + item.ID
 	}
 	if len(v.Authors) > 0 {
 		b.Author = v.Authors[0]
@@ -103,17 +108,22 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 }
 
 var (
-	htmlBreaks = regexp.MustCompile(`(?i)<br\s*/?>|</p>\s*<p>|</p>|<p>`)
-	htmlTags   = regexp.MustCompile(`<[^>]+>`)
+	htmlPara = regexp.MustCompile(`(?i)\s*</p>\s*<p[^>]*>\s*|</p>|<p[^>]*>`)
+	htmlBr   = regexp.MustCompile(`(?i)<br\s*/?>`)
+	htmlTags = regexp.MustCompile(`<[^>]+>`)
+	manyNL   = regexp.MustCompile(`\n{3,}`)
 	// common publisher trailer Google bakes into ebook descriptions
 	drmTrailer = regexp.MustCompile(`(?i)\s*At the Publisher.s request, this title is being sold without Digital Rights Management Software \(DRM\) applied\.?`)
 )
 
-// cleanHTML turns Google's HTML descriptions into plain text and drops known boilerplate.
+// cleanHTML turns Google's HTML descriptions into plain text: paragraph tags
+// become blank-line breaks, <br> a single newline, known boilerplate is dropped.
 func cleanHTML(s string) string {
-	s = htmlBreaks.ReplaceAllString(s, "\n")
+	s = htmlPara.ReplaceAllString(s, "\n\n")
+	s = htmlBr.ReplaceAllString(s, "\n")
 	s = htmlTags.ReplaceAllString(s, "")
 	s = html.UnescapeString(s)
 	s = drmTrailer.ReplaceAllString(s, "")
+	s = manyNL.ReplaceAllString(s, "\n\n")
 	return strings.TrimSpace(s)
 }

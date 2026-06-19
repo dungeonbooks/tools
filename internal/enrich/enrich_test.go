@@ -56,7 +56,7 @@ func TestBookSourceForcesSingleProvider(t *testing.T) {
 		fakeOL{byISBN: bookmeta.Book{Title: "FROM_GB"}},
 		fakeOL{byISBN: bookmeta.Book{Title: "FROM_OL"}},
 	)
-	for src, want := range map[string]string{"hardcover": "FROM_HC", "google": "FROM_GB", "openlibrary": "FROM_OL"} {
+	for src, want := range map[string]string{SourceHardcover: "FROM_HC", SourceGoogle: "FROM_GB", SourceOpenLibrary: "FROM_OL"} {
 		b, err := svc.Book(context.Background(), "9780593128282", src)
 		if err != nil {
 			t.Fatal(err)

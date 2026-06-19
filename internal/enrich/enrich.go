@@ -87,7 +87,8 @@ func single(ctx context.Context, src Source, query, isbn string) (bookmeta.Book,
 	return src.Search(ctx, query)
 }
 
-// auto runs Hardcover -> Google -> OpenLibrary, stopping once cover + description fill.
+// auto runs Hardcover -> Google -> OpenLibrary, stopping once title, cover, and
+// description are filled (see needsMore).
 func (s *Service) auto(ctx context.Context, query, isbn string) (bookmeta.Book, error) {
 	if isbn != "" {
 		var b bookmeta.Book

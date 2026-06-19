@@ -33,8 +33,9 @@ install:
 clean:
 	rm -f marty
 
-# everything CI and the pre-commit hook run (vet + test compile-check the code, no binary)
-check: vet fmt-check test
+# build + vet + gofmt + test — the gate CI and the pre-commit hook run (leaves no binary)
+check: fmt-check vet test
+	go build ./...
 
 # enable the repo's git hooks (one-time, per clone)
 hooks:
