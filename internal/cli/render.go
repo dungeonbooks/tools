@@ -74,8 +74,6 @@ func trim(s []string, n int) []string {
 
 var blankLine = regexp.MustCompile(`\n\s*\n`)
 
-// paragraphs wraps each paragraph to width, separated by a blank line. Paragraph
-// boundaries are blank lines; single newlines within a paragraph fold to spaces.
 func paragraphs(s string, width int) string {
 	var out []string
 	for _, p := range blankLine.Split(s, -1) {

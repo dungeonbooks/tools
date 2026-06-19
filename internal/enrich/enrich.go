@@ -1,5 +1,3 @@
-// Package enrich resolves one book to rich metadata, layering Hardcover
-// (ratings, genres), Google Books (broad coverage), and OpenLibrary (fallback).
 package enrich
 
 import (
@@ -12,20 +10,17 @@ import (
 	"github.com/dungeonbooks/tools/internal/bookmeta"
 )
 
-// Source names for forcing a single provider (default "" = merged waterfall).
 const (
 	SourceHardcover   = "hardcover"
 	SourceGoogle      = "google"
 	SourceOpenLibrary = "openlibrary"
 )
 
-// Source is a keyless-style metadata source (Google Books, OpenLibrary).
 type Source interface {
 	ByISBN(ctx context.Context, isbn string) (bookmeta.Book, error)
 	Search(ctx context.Context, query string) (bookmeta.Book, error)
 }
 
-// HCSource is Hardcover, which adds reader-signal data and gates on a token.
 type HCSource interface {
 	Enabled() bool
 	ByISBN(ctx context.Context, isbn string) (bookmeta.Book, error)
@@ -42,19 +37,15 @@ func NewService(hc HCSource, gb, ol Source) *Service {
 	return &Service{hc: hc, gb: gb, ol: ol}
 }
 
-// New wires the real Hardcover, Google Books, and OpenLibrary clients.
 func New(hardcoverToken, googleKey string) *Service {
 	hc := &http.Client{Timeout: 15 * time.Second}
 	return NewService(NewHardcover(hardcoverToken, hc), NewGoogleBooks(googleKey, hc), NewOpenLibrary(hc))
 }
 
-// needsMore reports whether a book is missing fields worth filling from another source.
 func needsMore(b bookmeta.Book) bool {
 	return b.Title == "" || b.CoverURL == "" || b.Description == ""
 }
 
-// Book resolves a query (ISBN or phrase) to one enriched book. source forces a
-// single provider for comparison; "" runs the merged waterfall.
 func (s *Service) Book(ctx context.Context, query, source string) (bookmeta.Book, error) {
 	isbn := ""
 	if n := bookmeta.NormalizeISBN(query); bookmeta.PlausibleISBN13(n) {
@@ -87,8 +78,6 @@ func single(ctx context.Context, src Source, query, isbn string) (bookmeta.Book,
 	return src.Search(ctx, query)
 }
 
-// auto runs Hardcover -> Google -> OpenLibrary, stopping once title, cover, and
-// description are filled (see needsMore).
 func (s *Service) auto(ctx context.Context, query, isbn string) (bookmeta.Book, error) {
 	if isbn != "" {
 		var b bookmeta.Book

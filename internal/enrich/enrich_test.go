@@ -26,8 +26,6 @@ func (f fakeHC) SearchTop(context.Context, string) (bookmeta.Book, error) { retu
 func (f fakeHC) ByISBN(context.Context, string) (bookmeta.Book, error)    { return f.byISBN, nil }
 
 func TestBookISBNUsesHardcoverThenFillsFromOL(t *testing.T) {
-	// OL lacks the new book's description/rating; Hardcover has them. OL still
-	// supplies the cover and page count.
 	ol := fakeOL{byISBN: bookmeta.Book{CoverURL: "c", PageCount: 300}}
 	hc := fakeHC{enabled: true, byISBN: bookmeta.Book{Title: "X", Author: "A", ISBN13: "9780593128282", Rating: 4.2, RatingsCount: 10, Description: "d", Subjects: []string{"Fantasy"}}}
 	b, err := NewService(hc, fakeOL{}, ol).Book(context.Background(), "9780593128282", "")

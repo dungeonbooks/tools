@@ -8,9 +8,9 @@ func TestPlausibleISBN13(t *testing.T) {
 		"9791234567890": true,
 		"N/A":           false,
 		"":              false,
-		"0316595500":    false, // ISBN-10
-		"978031659550X": false, // non-digit
-		"123456789012":  false, // wrong prefix/length
+		"0316595500":    false,
+		"978031659550X": false,
+		"123456789012":  false,
 	}
 	for in, want := range cases {
 		if got := PlausibleISBN13(NormalizeISBN(in)); got != want {

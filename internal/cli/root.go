@@ -1,4 +1,3 @@
-// Package cli wires the marty command tree.
 package cli
 
 import (

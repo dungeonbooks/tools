@@ -14,8 +14,6 @@ import (
 	"github.com/dungeonbooks/tools/internal/bookmeta"
 )
 
-// GoogleBooks is a broad, free source; better new-release coverage than Open
-// Library, thinner reader data than Hardcover. Key is optional (keyless is throttled).
 type GoogleBooks struct {
 	http *http.Client
 	key  string
@@ -89,8 +87,7 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 		CoverURL:    v.ImageLinks.Thumbnail,
 	}
 	if item.ID != "" {
-		// new Google Books experience (classic books.google.com is being sunset);
-		// "_" is a slug placeholder Google expands to the canonical title.
+		// "_" is a slug placeholder Google expands to the title
 		b.GoogleURL = "https://www.google.com/books/edition/_/" + item.ID
 	}
 	if len(v.Authors) > 0 {
@@ -110,16 +107,13 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 }
 
 var (
-	htmlPara = regexp.MustCompile(`(?i)\s*</p>\s*<p[^>]*>\s*|</p>|<p[^>]*>`)
-	htmlBr   = regexp.MustCompile(`(?i)<br\s*/?>`)
-	htmlTags = regexp.MustCompile(`<[^>]+>`)
-	manyNL   = regexp.MustCompile(`\n{3,}`)
-	// common publisher trailer Google bakes into ebook descriptions
+	htmlPara   = regexp.MustCompile(`(?i)\s*</p>\s*<p[^>]*>\s*|</p>|<p[^>]*>`)
+	htmlBr     = regexp.MustCompile(`(?i)<br\s*/?>`)
+	htmlTags   = regexp.MustCompile(`<[^>]+>`)
+	manyNL     = regexp.MustCompile(`\n{3,}`)
 	drmTrailer = regexp.MustCompile(`(?i)\s*At the Publisher.s request, this title is being sold without Digital Rights Management Software \(DRM\) applied\.?`)
 )
 
-// cleanHTML turns Google's HTML descriptions into plain text: paragraph tags
-// become blank-line breaks, <br> a single newline, known boilerplate is dropped.
 func cleanHTML(s string) string {
 	s = htmlPara.ReplaceAllString(s, "\n\n")
 	s = htmlBr.ReplaceAllString(s, "\n")
