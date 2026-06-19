@@ -10,8 +10,6 @@ import (
 	"github.com/dungeonbooks/tools/internal/bookmeta"
 )
 
-// Hardcover is the GraphQL source for rating, genres, series, and description.
-// Requires an Authorization token; without one, callers fall back to OpenLibrary.
 type Hardcover struct {
 	http  *http.Client
 	url   string
@@ -42,8 +40,6 @@ const editionByISBNQuery = `query EditionByISBN($isbn: String!) {
   editions(where: {isbn_13: {_eq: $isbn}}, limit: 1) { book { id } }
 }`
 
-// ByISBN resolves an ISBN-13 to a fully detailed book (Hardcover carries new
-// releases that OpenLibrary often lacks).
 func (h *Hardcover) ByISBN(ctx context.Context, isbn string) (bookmeta.Book, error) {
 	var er struct {
 		Editions []struct {
@@ -61,7 +57,6 @@ func (h *Hardcover) ByISBN(ctx context.Context, isbn string) (bookmeta.Book, err
 	return h.byID(ctx, er.Editions[0].Book.ID)
 }
 
-// SearchTop returns the top-ranked book for a query, fully detailed.
 func (h *Hardcover) SearchTop(ctx context.Context, query string) (bookmeta.Book, error) {
 	var sr struct {
 		Search struct {

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Build, vet, gofmt-check, and test before each commit.
+# Enable once per clone with: make hooks
+exec make check

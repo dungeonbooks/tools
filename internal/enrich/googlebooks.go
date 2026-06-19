@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/dungeonbooks/tools/internal/bookmeta"
 )
 
-// GoogleBooks is a broad, free source; better new-release coverage than Open
-// Library, thinner reader data than Hardcover. Key is optional (keyless is throttled).
 type GoogleBooks struct {
 	http *http.Client
 	key  string
@@ -38,6 +39,7 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 	}
 	var raw struct {
 		Items []struct {
+			ID         string `json:"id"`
 			VolumeInfo struct {
 				Title         string   `json:"title"`
 				Authors       []string `json:"authors"`
@@ -46,8 +48,6 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 				PublishedDate string   `json:"publishedDate"`
 				PageCount     int      `json:"pageCount"`
 				Categories    []string `json:"categories"`
-				AverageRating float64  `json:"averageRating"`
-				RatingsCount  int      `json:"ratingsCount"`
 				ImageLinks    struct {
 					Thumbnail string `json:"thumbnail"`
 				} `json:"imageLinks"`
@@ -76,16 +76,19 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 	if len(raw.Items) == 0 {
 		return bookmeta.Book{}, nil
 	}
-	v := raw.Items[0].VolumeInfo
+	item := raw.Items[0]
+	v := item.VolumeInfo
 	b := bookmeta.Book{
-		Title:        v.Title,
-		Description:  v.Description,
-		Publisher:    v.Publisher,
-		PageCount:    v.PageCount,
-		Subjects:     v.Categories,
-		Rating:       v.AverageRating,
-		RatingsCount: v.RatingsCount,
-		CoverURL:     v.ImageLinks.Thumbnail,
+		Title:       v.Title,
+		Description: cleanHTML(v.Description),
+		Publisher:   v.Publisher,
+		PageCount:   v.PageCount,
+		Subjects:    v.Categories,
+		CoverURL:    v.ImageLinks.Thumbnail,
+	}
+	if item.ID != "" {
+		// "_" is a slug placeholder Google expands to the title
+		b.GoogleURL = "https://www.google.com/books/edition/_/" + item.ID
 	}
 	if len(v.Authors) > 0 {
 		b.Author = v.Authors[0]
@@ -101,4 +104,22 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 		}
 	}
 	return b, nil
+}
+
+var (
+	htmlPara   = regexp.MustCompile(`(?i)\s*</p>\s*<p[^>]*>\s*|</p>|<p[^>]*>`)
+	htmlBr     = regexp.MustCompile(`(?i)<br\s*/?>`)
+	htmlTags   = regexp.MustCompile(`<[^>]+>`)
+	manyNL     = regexp.MustCompile(`\n{3,}`)
+	drmTrailer = regexp.MustCompile(`(?i)\s*At the Publisher.s request, this title is being sold without Digital Rights Management Software \(DRM\) applied\.?`)
+)
+
+func cleanHTML(s string) string {
+	s = htmlPara.ReplaceAllString(s, "\n\n")
+	s = htmlBr.ReplaceAllString(s, "\n")
+	s = htmlTags.ReplaceAllString(s, "")
+	s = html.UnescapeString(s)
+	s = drmTrailer.ReplaceAllString(s, "")
+	s = manyNL.ReplaceAllString(s, "\n\n")
+	return strings.TrimSpace(s)
 }

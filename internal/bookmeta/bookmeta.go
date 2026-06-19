@@ -1,4 +1,3 @@
-// Package bookmeta holds the shared book value type.
 package bookmeta
 
 import "strings"
@@ -17,6 +16,7 @@ type Book struct {
 	PageCount    int      `json:"page_count,omitempty"`
 	Year         int      `json:"year,omitempty"`
 	HardcoverURL string   `json:"hardcover_url,omitempty"`
+	GoogleURL    string   `json:"google_url,omitempty"`
 }
 
 func NormalizeISBN(s string) string {
@@ -28,7 +28,6 @@ func NormalizeISBN(s string) string {
 	}, strings.TrimSpace(s))
 }
 
-// PlausibleISBN13 reports whether s is 13 digits with a 978/979 prefix.
 func PlausibleISBN13(s string) bool {
 	if len(s) != 13 || (!strings.HasPrefix(s, "978") && !strings.HasPrefix(s, "979")) {
 		return false
@@ -41,7 +40,6 @@ func PlausibleISBN13(s string) bool {
 	return true
 }
 
-// Fill copies non-empty fields from src into dst where dst is empty/zero.
 func (dst *Book) Fill(src Book) {
 	if dst.ISBN13 == "" {
 		dst.ISBN13 = src.ISBN13
@@ -79,5 +77,8 @@ func (dst *Book) Fill(src Book) {
 	}
 	if dst.HardcoverURL == "" {
 		dst.HardcoverURL = src.HardcoverURL
+	}
+	if dst.GoogleURL == "" {
+		dst.GoogleURL = src.GoogleURL
 	}
 }

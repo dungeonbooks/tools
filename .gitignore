@@ -3,9 +3,9 @@
 *.env.local
 
 # build output
+/marty
 /bin/
 /dist/
-*_templ.go.bak
 
 # go
 /vendor/

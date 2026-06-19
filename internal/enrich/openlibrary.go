@@ -12,7 +12,6 @@ import (
 	"github.com/dungeonbooks/tools/internal/bookmeta"
 )
 
-// OpenLibrary is a free, keyless source for cover, author, subjects, and pages.
 type OpenLibrary struct {
 	http *http.Client
 	base string // override for tests; defaults to https://openlibrary.org
