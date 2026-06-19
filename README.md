@@ -1,33 +1,34 @@
-# Dungeon Books Tools
+# marty
 
-Tools for booksellers, served at `tools.dungeonbooks.com`. Go, single static binaries,
-one service per concern.
+Marty — the bookseller's wizard, as a Go CLI. Internal tooling for Dungeon Books.
 
-## Services
+## Commands
 
-| Service     | Path            | Role                                                  |
-|-------------|-----------------|-------------------------------------------------------|
-| `discovery` | `cmd/discovery` | Exa trending-book search + Open Library ISBN lookup   |
-| `catalog`   | `cmd/catalog`   | tracks discovered books worth sourcing                |
+| Command | What it does |
+|---|---|
+| `marty book <title\|isbn>` | Look up a book with rich metadata (cover, description, rating, genres) |
 
-## Endpoints
+An ISBN argument looks the book up directly; anything else is treated as a search phrase.
+Add `--json` for machine-readable output.
 
-Both expose `GET /health`.
+## Sources
 
-**discovery** (needs `EXA_API_KEY`)
-- `POST /v1/discover` — `{"query": "...", "numResults": 15}` → `{"books": [...]}`
+`book` layers three sources, stopping once the important fields are filled:
 
-**catalog**
-- `GET  /v1/candidates?status=&ingram_status=` → `{"candidates": [...]}`
-- `POST /v1/candidates` — `{"books": [...]}` → tracked candidates (idempotent by ISBN-13)
-- `POST /v1/candidates/{id}/dismiss`
+1. **Hardcover** (`HARDCOVER_API_TOKEN`) — ratings, genre tags, descriptions, new releases.
+2. **Google Books** (`GOOGLE_BOOKS_API_KEY`, optional) — broad coverage fallback.
+3. **Open Library** (keyless) — last-resort gap fill.
+
+Without a Hardcover token it degrades to Google Books + Open Library.
 
 ## Develop
 
+Requires Go 1.24+.
+
 ```sh
-cp .env.example .env        # set EXA_API_KEY
+cp .env.example .env        # set HARDCOVER_API_TOKEN
 go build ./...
 go test ./...
-go run ./cmd/discovery      # :8080
-go run ./cmd/catalog        # :8080
+go run ./cmd/marty book "the will of the many"
+go run ./cmd/marty book 9780593128282 --json
 ```
