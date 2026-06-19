@@ -49,8 +49,6 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 				PublishedDate string   `json:"publishedDate"`
 				PageCount     int      `json:"pageCount"`
 				Categories    []string `json:"categories"`
-				AverageRating float64  `json:"averageRating"`
-				RatingsCount  int      `json:"ratingsCount"`
 				ImageLinks    struct {
 					Thumbnail string `json:"thumbnail"`
 				} `json:"imageLinks"`
@@ -81,14 +79,12 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 	}
 	v := raw.Items[0].VolumeInfo
 	b := bookmeta.Book{
-		Title:        v.Title,
-		Description:  cleanHTML(v.Description),
-		Publisher:    v.Publisher,
-		PageCount:    v.PageCount,
-		Subjects:     v.Categories,
-		Rating:       v.AverageRating,
-		RatingsCount: v.RatingsCount,
-		CoverURL:     v.ImageLinks.Thumbnail,
+		Title:       v.Title,
+		Description: cleanHTML(v.Description),
+		Publisher:   v.Publisher,
+		PageCount:   v.PageCount,
+		Subjects:    v.Categories,
+		CoverURL:    v.ImageLinks.Thumbnail,
 	}
 	if len(v.Authors) > 0 {
 		b.Author = v.Authors[0]
@@ -109,11 +105,15 @@ func (g *GoogleBooks) query(ctx context.Context, q string) (bookmeta.Book, error
 var (
 	htmlBreaks = regexp.MustCompile(`(?i)<br\s*/?>|</p>\s*<p>|</p>|<p>`)
 	htmlTags   = regexp.MustCompile(`<[^>]+>`)
+	// common publisher trailer Google bakes into ebook descriptions
+	drmTrailer = regexp.MustCompile(`(?i)\s*At the Publisher.s request, this title is being sold without Digital Rights Management Software \(DRM\) applied\.?`)
 )
 
-// cleanHTML turns Google's HTML descriptions into plain text with paragraph breaks.
+// cleanHTML turns Google's HTML descriptions into plain text and drops known boilerplate.
 func cleanHTML(s string) string {
 	s = htmlBreaks.ReplaceAllString(s, "\n")
 	s = htmlTags.ReplaceAllString(s, "")
-	return strings.TrimSpace(html.UnescapeString(s))
+	s = html.UnescapeString(s)
+	s = drmTrailer.ReplaceAllString(s, "")
+	return strings.TrimSpace(s)
 }
