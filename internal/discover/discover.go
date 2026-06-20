@@ -45,8 +45,9 @@ func NewService(providers ...Provider) *Service {
 	return &Service{providers: providers}
 }
 
-// New builds the default service. exaKey wires the Exa provider when present;
-// with no key the service degrades to Fake (offline dev/tests).
+// New builds the default service. The Exa provider lands in a later change, so
+// for now the service always uses Fake (offline dev/tests); exaKey is accepted
+// to keep the signature stable across that change.
 func New(exaKey string) *Service {
 	return NewService(NewFake())
 }
