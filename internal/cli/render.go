@@ -89,7 +89,7 @@ func renderTrending(w io.Writer, cs []discover.Candidate, asJSON bool) error {
 		}
 		fmt.Fprintf(w, "%d. %s\n", i+1, head)
 		if c.WhyTrending != "" {
-			fmt.Fprintln(w, "   "+wrapLine(c.WhyTrending, 76))
+			fmt.Fprintln(w, indent(wrapLine(c.WhyTrending, 76), "   "))
 		}
 		if c.ISBN13 != "" {
 			fmt.Fprintln(w, "   ISBN "+c.ISBN13)
@@ -114,6 +114,12 @@ func paragraphs(s string, width int) string {
 		}
 	}
 	return strings.Join(out, "\n\n")
+}
+
+// indent prefixes every line of s, so wrapped continuation lines keep their
+// alignment under the numbered entry instead of falling back to column 0.
+func indent(s, prefix string) string {
+	return prefix + strings.ReplaceAll(s, "\n", "\n"+prefix)
 }
 
 func wrapLine(s string, width int) string {
