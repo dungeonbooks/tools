@@ -15,5 +15,6 @@ func Execute() error {
 	}
 	root.PersistentFlags().BoolVar(&jsonOut, "json", false, "output JSON")
 	root.AddCommand(bookCmd())
+	root.AddCommand(trendingCmd())
 	return root.Execute()
 }
