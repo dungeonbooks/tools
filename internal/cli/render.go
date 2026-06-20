@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/dungeonbooks/tools/internal/bookmeta"
+	"github.com/dungeonbooks/tools/internal/discover"
 )
 
 func renderBook(w io.Writer, b bookmeta.Book, asJSON bool) error {
@@ -70,6 +71,37 @@ func trim(s []string, n int) []string {
 		return s[:n]
 	}
 	return s
+}
+
+func renderTrending(w io.Writer, cs []discover.Candidate, asJSON bool) error {
+	if asJSON {
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(cs)
+	}
+	if len(cs) == 0 {
+		return nil
+	}
+	for i, c := range cs {
+		head := c.Title
+		if c.Author != "" {
+			head += " — " + c.Author
+		}
+		fmt.Fprintf(w, "%d. %s\n", i+1, head)
+		if c.WhyTrending != "" {
+			fmt.Fprintln(w, "   "+wrapLine(c.WhyTrending, 76))
+		}
+		if c.ISBN13 != "" {
+			fmt.Fprintln(w, "   ISBN "+c.ISBN13)
+		}
+		if c.SourceURL != "" {
+			fmt.Fprintln(w, "   "+c.SourceURL)
+		}
+		if i < len(cs)-1 {
+			fmt.Fprintln(w)
+		}
+	}
+	return nil
 }
 
 var blankLine = regexp.MustCompile(`\n\s*\n`)

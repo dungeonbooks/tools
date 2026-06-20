@@ -7,6 +7,7 @@ Marty — the bookseller's wizard, as a Go CLI. Internal tooling for Dungeon Boo
 | Command | What it does |
 |---|---|
 | `marty book <title\|isbn>` | Look up a book with rich metadata (cover, description, rating, genres) |
+| `marty trending [query]` | Discover trending books from web buzz (offline/fake mode in this slice) |
 
 An ISBN argument looks the book up directly; anything else is treated as a search phrase.
 Add `--json` for machine-readable output, or `--source hardcover|google|openlibrary` to
@@ -21,6 +22,14 @@ force a single source (default merges all three).
 3. **Open Library** (keyless) — last-resort gap fill.
 
 Without a Hardcover token it degrades to Google Books + Open Library.
+
+## Discovery
+
+`trending` surfaces books gaining buzz (BookTok, Reddit, press). This slice ships an
+offline `Fake` provider (canned hits, no network, no credits) so the verb and rendering
+are exercisable in dev and tests. `--source fake` forces it; default picks the first
+available provider. `--type` sets the search mode (`auto` default, `neural`, `keyword`);
+`--count` caps results. The real Exa provider and a SQLite cache land next.
 
 ## Develop
 
