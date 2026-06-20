@@ -73,11 +73,15 @@ func trim(s []string, n int) []string {
 	return s
 }
 
-func renderTrending(w io.Writer, cs []discover.Candidate, asJSON bool) error {
+func renderTrending(w io.Writer, cs []discover.Candidate, source string, asJSON bool) error {
 	if asJSON {
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		return enc.Encode(cs)
+	}
+	if source == discover.SourceFake {
+		fmt.Fprintln(w, "Source: fake (fixture data, not real)")
+		fmt.Fprintln(w)
 	}
 	if len(cs) == 0 {
 		return nil
@@ -85,7 +89,7 @@ func renderTrending(w io.Writer, cs []discover.Candidate, asJSON bool) error {
 	for i, c := range cs {
 		head := c.Title
 		if c.Author != "" {
-			head += " — " + c.Author
+			head += " by " + c.Author
 		}
 		fmt.Fprintf(w, "%d. %s\n", i+1, head)
 		if c.WhyTrending != "" {

@@ -7,7 +7,7 @@ Marty — the bookseller's wizard, as a Go CLI. Internal tooling for Dungeon Boo
 | Command | What it does |
 |---|---|
 | `marty book <title\|isbn>` | Look up a book with rich metadata (cover, description, rating, genres) |
-| `marty trending [query]` | Discover trending books from web buzz (offline/fake mode in this slice) |
+| `marty trending [query]` | Discover trending books from web buzz (Exa-backed, cached) |
 
 An ISBN argument looks the book up directly; anything else is treated as a search phrase.
 Add `--json` for machine-readable output, or `--source hardcover|google|openlibrary` to
@@ -25,11 +25,19 @@ Without a Hardcover token it degrades to Google Books + Open Library.
 
 ## Discovery
 
-`trending` surfaces books gaining buzz (BookTok, Reddit, press). This slice ships an
-offline `Fake` provider (canned hits, no network, no credits) so the verb and rendering
-are exercisable in dev and tests. `--source fake` forces it; default picks the first
-available provider. `--type` sets the search mode (`auto` default, `neural`, `keyword`);
-`--count` caps results. The real Exa provider and a SQLite cache land next.
+`trending` surfaces books gaining buzz (BookTok, Reddit, press) via the paid Exa
+provider, then resolves missing ISBNs through the metadata pipeline. Set `EXA_API_KEY`
+to enable it; without a key `trending` errors rather than guessing.
+
+Results are cached in SQLite (24h TTL) so repeat queries don't re-spend; `--refresh`
+bypasses the cache for one call and `--no-cache` disables it. When a paid call happens,
+its exact cost (from Exa) prints to stderr alongside the lifetime total. `--no-resolve`
+skips ISBN lookups.
+
+An offline `Fake` provider (canned hits, no network, no credits) backs dev and tests. It
+is **never** selected automatically — fabricated titles must not pass as real discovery —
+so reach it only with `--source fake`, which labels its output as fixture data. `--type`
+sets the search mode (`auto` default, `neural`, `keyword`); `--count` caps results.
 
 ## Develop
 
