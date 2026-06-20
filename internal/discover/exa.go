@@ -95,7 +95,7 @@ func (e *Exa) Trending(ctx context.Context, query, typ string, count int) ([]Can
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("exa: status %d", resp.StatusCode)
+		return nil, fmt.Errorf("exa: status %s", resp.Status)
 	}
 	var raw struct {
 		Answer struct {

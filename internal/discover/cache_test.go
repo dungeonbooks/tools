@@ -65,6 +65,14 @@ func TestCacheRejectsExpiredEntries(t *testing.T) {
 	if hit, ok, err := c.Get(key); err != nil || ok || hit != nil {
 		t.Fatalf("expected expired miss, ok=%v err=%v", ok, err)
 	}
+	// The expired row should be purged on read so the file stays bounded.
+	var n int
+	if err := c.db.QueryRow(`SELECT COUNT(*) FROM trending_cache WHERE key = ?`, key).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatalf("expected expired row to be deleted, found %d", n)
+	}
 }
 
 func newTestCache(t *testing.T) *Cache {

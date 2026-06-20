@@ -47,9 +47,11 @@ INSERT OR IGNORE INTO exa_usage (id, total_cents, calls) VALUES (1, 0, 0);
 
 func (c *Cache) Close() error { return c.db.Close() }
 
-// cacheKey is the stable tuple a result is cached under.
+// cacheKey is the stable tuple a result is cached under. Fields are quoted with
+// %q so a delimiter character inside query (or another field) can't shift the
+// boundaries and collide with a different tuple.
 func cacheKey(source, typ, query string, count int) string {
-	return fmt.Sprintf("%s|%s|%s|%d", source, typ, query, count)
+	return fmt.Sprintf("%q|%q|%q|%d", source, typ, query, count)
 }
 
 // Get returns unexpired cached candidates for the key, or (nil,false) on miss.
@@ -64,6 +66,9 @@ func (c *Cache) Get(key string) ([]Candidate, bool, error) {
 		return nil, false, err
 	}
 	if time.Since(time.Unix(createdAt, 0)) > cacheTTL {
+		// Drop the stale row so the file stays bounded and we don't re-check
+		// the same expired entry on every read.
+		_, _ = c.db.Exec(`DELETE FROM trending_cache WHERE key = ?`, key)
 		return nil, false, nil
 	}
 	var cs []Candidate

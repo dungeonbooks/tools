@@ -70,13 +70,16 @@ func nameTokens(s string) []string {
 }
 
 // initialMatch treats a single letter as the initial of a longer name sharing
-// that first letter ("j" ~ "john"), and otherwise requires equality.
+// that first letter ("j" ~ "john"), and otherwise requires equality. Lengths
+// and the leading character are compared by rune so non-ASCII names ("Émile" ~
+// "É.") gate correctly.
 func initialMatch(a, b string) bool {
 	if a == b {
 		return true
 	}
-	if len(a) == 1 || len(b) == 1 {
-		return a[0] == b[0]
+	ar, br := []rune(a), []rune(b)
+	if len(ar) == 1 || len(br) == 1 {
+		return ar[0] == br[0]
 	}
 	return false
 }
