@@ -3,6 +3,7 @@ package discover
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 )
 
@@ -106,6 +107,75 @@ func TestServiceCachesResultsAndRefreshBypasses(t *testing.T) {
 	}
 	if calls != 2 {
 		t.Fatalf("expected 2 provider calls after --refresh, got %d", calls)
+	}
+}
+
+type stubResolver struct {
+	byTitle map[string]string
+	calls   int
+	mu      sync.Mutex
+}
+
+func (r *stubResolver) ResolveISBN(_ context.Context, title, _ string) (string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls++
+	if isbn, ok := r.byTitle[title]; ok {
+		return isbn, nil
+	}
+	return "", errors.New("not found")
+}
+
+func TestTrendingResolvesMissingISBNs(t *testing.T) {
+	p := fakeProvider{name: SourceFake, on: true, cands: []Candidate{
+		{Title: "Sublimation"},
+		{Title: "Already Tagged", ISBN13: "9780000000000"},
+		{Title: "Unknown Book"},
+	}}
+	res := &stubResolver{byTitle: map[string]string{"Sublimation": "9781250799609"}}
+	svc := NewService(p).WithResolver(res)
+
+	cs, err := svc.Trending(context.Background(), "", "", TypeAuto, 5, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cs[0].ISBN13 != "9781250799609" {
+		t.Fatalf("expected resolved ISBN, got %q", cs[0].ISBN13)
+	}
+	if cs[1].ISBN13 != "9780000000000" {
+		t.Fatalf("pre-set ISBN should be untouched, got %q", cs[1].ISBN13)
+	}
+	if cs[2].ISBN13 != "" {
+		t.Fatalf("unresolved candidate should stay empty, got %q", cs[2].ISBN13)
+	}
+	// Candidate that already carried an ISBN must not trigger a lookup.
+	if res.calls != 2 {
+		t.Fatalf("expected 2 resolver calls, got %d", res.calls)
+	}
+}
+
+func TestTrendingResolvesBeforeCaching(t *testing.T) {
+	calls := 0
+	p := countingProvider{name: SourceFake, cands: []Candidate{{Title: "Sublimation"}}, n: &calls}
+	res := &stubResolver{byTitle: map[string]string{"Sublimation": "9781250799609"}}
+	cache := newTestCache(t)
+	defer cache.Close()
+	svc := NewService(p).WithCache(cache).WithResolver(res)
+
+	ctx := context.Background()
+	if _, err := svc.Trending(ctx, "q", "", TypeAuto, 5, false); err != nil {
+		t.Fatal(err)
+	}
+	cs, err := svc.Trending(ctx, "q", "", TypeAuto, 5, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cs[0].ISBN13 != "9781250799609" {
+		t.Fatalf("cached result missing resolved ISBN, got %q", cs[0].ISBN13)
+	}
+	// Second call is a cache hit, so the resolver runs only on the fresh fetch.
+	if res.calls != 1 {
+		t.Fatalf("expected resolver to run once (cached afterward), got %d", res.calls)
 	}
 }
 

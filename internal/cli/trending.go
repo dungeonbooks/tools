@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/dungeonbooks/tools/internal/discover"
+	"github.com/dungeonbooks/tools/internal/enrich"
 	"github.com/dungeonbooks/tools/internal/platform/config"
 	"github.com/spf13/cobra"
 )
@@ -14,7 +16,7 @@ import (
 func trendingCmd() *cobra.Command {
 	var source, typ string
 	var count int
-	var refresh, noCache bool
+	var refresh, noCache, noResolve bool
 	c := &cobra.Command{
 		Use:   "trending [query...]",
 		Short: "Discover trending books from web buzz",
@@ -23,6 +25,10 @@ func trendingCmd() *cobra.Command {
 			query := strings.Join(args, " ")
 			cfg := config.Load()
 			svc := discover.New(cfg.ExaAPIKey)
+
+			if !noResolve {
+				svc.WithResolver(isbnResolver{enrich.New(cfg.HardcoverToken, cfg.GoogleBooksKey)})
+			}
 
 			if !noCache {
 				if cache, err := openTrendingCache(cfg); err == nil {
@@ -53,7 +59,18 @@ func trendingCmd() *cobra.Command {
 	c.Flags().IntVar(&count, "count", 10, "max results")
 	c.Flags().BoolVar(&refresh, "refresh", false, "bypass the cache for this call")
 	c.Flags().BoolVar(&noCache, "no-cache", false, "disable the local cache entirely")
+	c.Flags().BoolVar(&noResolve, "no-resolve", false, "skip ISBN resolution via metadata lookup")
 	return c
+}
+
+// isbnResolver adapts the enrich service to discover.ISBNResolver, chaining a
+// title/author lookup onto each web-buzz candidate that arrives without an ISBN.
+type isbnResolver struct {
+	svc *enrich.Service
+}
+
+func (r isbnResolver) ResolveISBN(ctx context.Context, title, author string) (string, error) {
+	return r.svc.ISBN(ctx, title, author)
 }
 
 func openTrendingCache(cfg config.Config) (*discover.Cache, error) {

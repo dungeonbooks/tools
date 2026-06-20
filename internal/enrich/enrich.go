@@ -71,6 +71,29 @@ func (s *Service) Book(ctx context.Context, query, source string) (bookmeta.Book
 	}
 }
 
+// ISBN resolves a title (optionally with author) to an ISBN-13, returning ""
+// when no confident match carries one. It reuses the auto lookup, so it benefits
+// from the same Hardcover/Google/OpenLibrary fallback chain as Book.
+//
+// When an author is supplied it acts as a confidence gate: the matched book's
+// author must agree, otherwise we discard the ISBN rather than risk pinning an
+// obscure or pre-publication title to the wrong edition. Without an author we
+// can't gate, so the top match is accepted as-is.
+func (s *Service) ISBN(ctx context.Context, title, author string) (string, error) {
+	query := title
+	if author != "" {
+		query += " " + author
+	}
+	b, err := s.Book(ctx, query, "")
+	if err != nil {
+		return "", err
+	}
+	if author != "" && !bookmeta.AuthorsMatch(author, b.Author) {
+		return "", nil
+	}
+	return b.ISBN13, nil
+}
+
 func single(ctx context.Context, src Source, query, isbn string) (bookmeta.Book, error) {
 	if isbn != "" {
 		return src.ByISBN(ctx, isbn)

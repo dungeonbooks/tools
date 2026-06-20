@@ -68,6 +68,37 @@ func TestBookSourceForcesSingleProvider(t *testing.T) {
 	}
 }
 
+func TestISBNGatesOnAuthorAgreement(t *testing.T) {
+	// Top match carries an ISBN but a different author: the gate rejects it.
+	mismatch := fakeHC{enabled: true, top: bookmeta.Book{Title: "Sublimation", Author: "Someone Else", ISBN13: "9781250799609"}}
+	got, err := NewService(mismatch, fakeOL{}, fakeOL{}).ISBN(context.Background(), "Sublimation", "Isabel J. Kim")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "" {
+		t.Fatalf("expected mismatched author to gate out the ISBN, got %q", got)
+	}
+
+	// Author agrees (allowing for the dropped middle initial): ISBN accepted.
+	match := fakeHC{enabled: true, top: bookmeta.Book{Title: "Sublimation", Author: "Isabel Kim", ISBN13: "9781250799609"}}
+	got, err = NewService(match, fakeOL{}, fakeOL{}).ISBN(context.Background(), "Sublimation", "Isabel J. Kim")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "9781250799609" {
+		t.Fatalf("expected matching author to keep the ISBN, got %q", got)
+	}
+
+	// No expected author means nothing to gate on: accept the top match.
+	got, err = NewService(match, fakeOL{}, fakeOL{}).ISBN(context.Background(), "Sublimation", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "9781250799609" {
+		t.Fatalf("expected ungated lookup to keep the ISBN, got %q", got)
+	}
+}
+
 func TestGoogleBooksByISBNParses(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Write([]byte(`{"items":[{"volumeInfo":{"title":"The Unicorn Hunters","authors":["Katherine Arden"],"description":"d","pageCount":352,"publishedDate":"2026-06-02","categories":["Fiction"],"averageRating":4.0,"ratingsCount":5,"imageLinks":{"thumbnail":"http://cover"},"industryIdentifiers":[{"type":"ISBN_13","identifier":"9780593128282"}]}}]}`))

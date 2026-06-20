@@ -44,7 +44,7 @@ func renderBook(w io.Writer, b bookmeta.Book, asJSON bool) error {
 		fmt.Fprintln(w, "Series: "+b.Series)
 	}
 	if b.ISBN13 != "" {
-		fmt.Fprintln(w, "ISBN "+b.ISBN13)
+		fmt.Fprintln(w, b.ISBN13)
 	}
 	if b.Description != "" {
 		fmt.Fprintln(w)
@@ -92,7 +92,7 @@ func renderTrending(w io.Writer, cs []discover.Candidate, asJSON bool) error {
 			fmt.Fprintln(w, indent(wrapLine(c.WhyTrending, 76), "   "))
 		}
 		if c.ISBN13 != "" {
-			fmt.Fprintln(w, "   ISBN "+c.ISBN13)
+			fmt.Fprintln(w, "   "+c.ISBN13)
 		}
 		if c.SourceURL != "" {
 			fmt.Fprintln(w, "   "+c.SourceURL)

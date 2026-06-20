@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -38,9 +39,22 @@ type Provider interface {
 	Trending(ctx context.Context, query, typ string, count int) ([]Candidate, error)
 }
 
+// ISBNResolver turns a title/author into an ISBN-13. Web-buzz candidates rarely
+// carry ISBNs, so the service chains this lookup after discovery. It lives as an
+// interface here so discover stays free of metadata-provider deps; the cli layer
+// implements it with the enrich service.
+type ISBNResolver interface {
+	ResolveISBN(ctx context.Context, title, author string) (string, error)
+}
+
+// resolveWorkers bounds concurrent ISBN lookups so a large --count doesn't fan
+// out a burst of requests at the metadata providers.
+const resolveWorkers = 5
+
 type Service struct {
 	providers []Provider
 	cache     *Cache
+	resolver  ISBNResolver
 }
 
 func NewService(providers ...Provider) *Service {
@@ -52,6 +66,14 @@ func NewService(providers ...Provider) *Service {
 // the cache key includes source to keep entries distinct.
 func (s *Service) WithCache(c *Cache) *Service {
 	s.cache = c
+	return s
+}
+
+// WithResolver attaches an ISBN resolver. Fresh provider results have their
+// ISBNs filled in before caching, so the (free) lookups run once per cache
+// entry rather than on every call.
+func (s *Service) WithResolver(r ISBNResolver) *Service {
+	s.resolver = r
 	return s
 }
 
@@ -87,12 +109,38 @@ func (s *Service) Trending(ctx context.Context, query, source, typ string, count
 	if err != nil {
 		return nil, err
 	}
+	if s.resolver != nil {
+		s.resolveISBNs(ctx, cs)
+	}
 	if s.cache != nil {
 		if err := s.cache.Put(key, cs); err != nil {
 			return nil, err
 		}
 	}
 	return cs, nil
+}
+
+// resolveISBNs fills empty ISBNs in place, concurrently and bounded. Lookup
+// failures are left silent: an unresolved ISBN just stays empty, which the
+// renderer already handles, so a flaky metadata provider never fails discovery.
+func (s *Service) resolveISBNs(ctx context.Context, cs []Candidate) {
+	sem := make(chan struct{}, resolveWorkers)
+	var wg sync.WaitGroup
+	for i := range cs {
+		if cs[i].ISBN13 != "" || cs[i].Title == "" {
+			continue
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(c *Candidate) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			if isbn, err := s.resolver.ResolveISBN(ctx, c.Title, c.Author); err == nil {
+				c.ISBN13 = isbn
+			}
+		}(&cs[i])
+	}
+	wg.Wait()
 }
 
 func (s *Service) pick(source string) (Provider, error) {
