@@ -11,6 +11,7 @@ type Config struct {
 	ExaAPIKey      string
 	HardcoverToken string
 	GoogleBooksKey string
+	CachePath      string
 }
 
 func Load() Config {
@@ -20,6 +21,7 @@ func Load() Config {
 		ExaAPIKey:      os.Getenv("EXA_API_KEY"),
 		HardcoverToken: os.Getenv("HARDCOVER_API_TOKEN"),
 		GoogleBooksKey: os.Getenv("GOOGLE_BOOKS_API_KEY"),
+		CachePath:      os.Getenv("MARTY_CACHE"),
 	}
 }
 
