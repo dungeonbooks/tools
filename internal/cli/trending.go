@@ -41,7 +41,7 @@ func trendingCmd() *cobra.Command {
 					defer cache.Close()
 					svc.WithCache(cache)
 				} else {
-					fmt.Fprintf(os.Stderr, "marty: cache disabled: %v\n", err)
+					fmt.Fprintf(cmd.ErrOrStderr(), "marty: cache disabled: %v\n", err)
 				}
 			}
 			if exa, ok := exaProvider(svc); ok {
