@@ -12,8 +12,24 @@ Marty — the bookseller's wizard, as a Go CLI. Internal tooling for Dungeon Boo
 | `marty mcp` | Serve book lookup as MCP tools over stdio (for agents) |
 
 An ISBN argument looks the book up directly; anything else is treated as a search phrase.
-Add `--json` for machine-readable output, or `--source hardcover|google|openlibrary` to
-force a single source (default merges all three).
+Use `--source hardcover|google|openlibrary` to force a single source (default merges all three).
+
+## Output
+
+Output is **agent-native by default**: a terminal gets human-readable tables, a pipe gets
+JSON. Force either way with `--json` / `--json=false` regardless of where stdout points.
+
+Exit codes are typed so scripts and agents can branch without parsing stderr:
+
+| Code | Meaning |
+|---|---|
+| `0` | success |
+| `1` | unclassified error |
+| `2` | usage (bad flag or argument) |
+| `3` | not found |
+| `4` | auth (missing or rejected credentials) |
+| `5` | upstream (provider returned an error) |
+| `7` | rate limited |
 
 ## Resolving
 
