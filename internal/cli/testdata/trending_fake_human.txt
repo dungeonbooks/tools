@@ -1,0 +1,9 @@
+Source: fake (fixture data, not real)
+
+1. The Will of the Many by James Islington
+   Surging on BookTok for its hard-magic academy setting and twist-heavy
+   plotting that readers keep reposting.
+   ISBN 9781982141172
+   https://example.com/will-of-the-many
+
+2. A Sorceress Comes to Call by T. Kingfisher
