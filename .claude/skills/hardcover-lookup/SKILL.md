@@ -19,7 +19,10 @@ python3 .claude/skills/hardcover-lookup/resolve.py --isbn 9780262542951
 ```
 
 Output (human): `9780262376303  The Beauty of Games — Frank Lantz (2023)  [confidence 1.0]`
-Output (`--json`): `{isbn13, title, author, year, hardcover_url, verified, confidence, query}`
+Output (`--json`): `{query, verified, confidence, isbn13, title, author, year, rating,
+ratings_count, hardcover_url}`. On an unverified result a `reason` field explains
+why (weak match, invalid ISBN, different ISBN returned, or not found); `rating`
+and `ratings_count` are present only when `marty` reports them (needs a token).
 
 **Exit code is the contract:** `0` = verified match, `1` = unverified (weak
 match or nothing found, details on stderr). Never trust an exit-1 ISBN.
@@ -49,7 +52,8 @@ bug. Report it rather than substituting a wrong ISBN.
 
 ## Setup (per machine)
 
-1. **Go 1.24+** must be installed (to build `marty` on first run).
+1. **Go 1.25+** (matches `go.mod`) must be installed to build `marty` on first
+   run, and **Python 3.10+** to run `resolve.py` (it uses `X | None` type syntax).
 2. **API token** — for ratings/genres and the Hardcover record, the resolver
    needs `HARDCOVER_API_TOKEN`. It is found in this order:
    - `HARDCOVER_API_TOKEN` already in the environment, else

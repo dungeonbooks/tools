@@ -108,14 +108,35 @@ def norm(s: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", (s or "").lower())).strip()
 
 
+def normalize_isbn(s: str) -> str:
+    return re.sub(r"[^0-9Xx]", "", s or "").upper()
+
+
+def valid_isbn13(s: str) -> bool:
+    d = normalize_isbn(s)
+    if len(d) != 13 or not d.isdigit():
+        return False
+    checksum = sum((1 if i % 2 == 0 else 3) * int(c) for i, c in enumerate(d))
+    return checksum % 10 == 0
+
+
 def title_score(want: str, got: str) -> float:
-    """How well `got` (may carry a subtitle) covers the requested title."""
+    """How well `got` (may carry a subtitle) covers the requested title.
+
+    Token overlap is scored as the *minimum* of recall and precision, so a
+    short title that merely appears inside a longer, unrelated one (want="It"
+    vs got="It Ends With Us") can't earn a perfect 1.0 from containment alone.
+    The SequenceMatcher ratio backstops legitimate subtitle matches, where the
+    requested title is a real prefix of the result.
+    """
     w, g = norm(want), norm(got)
     if not w or not g:
         return 0.0
     wt, gt = set(w.split()), set(g.split())
-    containment = len(wt & gt) / len(wt)
-    return max(containment, SequenceMatcher(None, w, g).ratio())
+    overlap = len(wt & gt)
+    recall = overlap / len(wt)
+    precision = overlap / len(gt)
+    return max(min(recall, precision), SequenceMatcher(None, w, g).ratio())
 
 
 def author_ok(want: str | None, got: str) -> bool:
@@ -124,6 +145,19 @@ def author_ok(want: str | None, got: str) -> bool:
     gt = set(norm(got).split())
     # any surname-ish token from the requested author present in the result
     return any(tok in gt for tok in norm(want).split() if len(tok) > 2)
+
+
+def book_fields(data: dict) -> dict:
+    """Pull the metadata fields we surface from a marty book record."""
+    return {
+        "isbn13": data.get("isbn13"),
+        "title": data.get("title"),
+        "author": data.get("author"),
+        "year": data.get("year"),
+        "rating": data.get("rating"),
+        "ratings_count": data.get("ratings_count"),
+        "hardcover_url": data.get("hardcover_url"),
+    }
 
 
 def resolve(title: str, author: str | None) -> dict:
@@ -142,28 +176,34 @@ def resolve(title: str, author: str | None) -> dict:
             break
     if best is None:
         return {"query": query, "verified": False, "reason": "no result with an ISBN from any source"}
-    return {
-        "query": query,
-        "verified": best_score >= CONFIDENCE_FLOOR,
-        "confidence": round(max(best_score, 0.0), 2),
-        "isbn13": best.get("isbn13"),
-        "title": best.get("title"),
-        "author": best.get("author"),
-        "year": best.get("year"),
-        "hardcover_url": best.get("hardcover_url"),
-    }
+    confidence = round(max(best_score, 0.0), 2)
+    verified = best_score >= CONFIDENCE_FLOOR
+    result = book_fields(best)
+    result.update({"query": query, "verified": verified, "confidence": confidence})
+    if not verified:
+        result["reason"] = f"weak title/author match (confidence {confidence} < {CONFIDENCE_FLOOR})"
+    return result
 
 
 def resolve_isbn(isbn: str) -> dict:
-    data = run_marty(isbn, None)
-    if not data or not data.get("isbn13"):
+    want = normalize_isbn(isbn)
+    if not valid_isbn13(want):
+        return {"query": isbn, "verified": False,
+                "reason": "not a valid ISBN-13 (need 13 digits with a correct check digit)"}
+    data = run_marty(want, None)
+    got = normalize_isbn(data.get("isbn13", "")) if data else ""
+    if not got:
         return {"query": isbn, "verified": False, "reason": "no book for that ISBN"}
-    return {
-        "query": isbn, "verified": True, "confidence": 1.0,
-        "isbn13": data.get("isbn13"), "title": data.get("title"),
-        "author": data.get("author"), "year": data.get("year"),
-        "hardcover_url": data.get("hardcover_url"),
-    }
+    result = book_fields(data)
+    result["query"] = isbn
+    if got != want:
+        # marty fell back to a search and returned a different book.
+        result["verified"] = False
+        result["confidence"] = 0.0
+        result["reason"] = f"marty returned a different ISBN ({data.get('isbn13')})"
+        return result
+    result.update({"verified": True, "confidence": 1.0})
+    return result
 
 
 def main() -> int:
