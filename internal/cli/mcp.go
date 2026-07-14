@@ -16,7 +16,7 @@ func mcpCmd() *cobra.Command {
 			"JSON-RPC on this process's stdin/stdout — so nothing else may write to\n" +
 			"stdout. Not meant to be run by hand; a client launches it. This repo\n" +
 			"registers it for Claude Code in .mcp.json.",
-		Args:         cobra.NoArgs,
+		Args:         usageArgs(cobra.NoArgs),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg := config.Load()

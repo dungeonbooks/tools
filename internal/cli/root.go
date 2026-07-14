@@ -39,10 +39,15 @@ func Execute() error {
 }
 
 // isTerminalWriter reports whether w is an interactive terminal. Anything that
-// isn't an *os.File (a pipe, a test buffer) counts as non-interactive.
+// isn't an *os.File (a pipe, a test buffer) counts as non-interactive. The
+// Cygwin check is not redundant: an MSYS/Cygwin console fails IsTerminal, and
+// without it an interactive Windows user gets a faceful of JSON.
 func isTerminalWriter(w io.Writer) bool {
 	f, ok := w.(*os.File)
-	return ok && isatty.IsTerminal(f.Fd())
+	if !ok {
+		return false
+	}
+	return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
 }
 
 // usageArgs tags an argument-count failure as a usage error (exit 2).
