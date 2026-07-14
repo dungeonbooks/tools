@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "marty": {
+      "command": "go",
+      "args": ["run", "./cmd/marty", "mcp"]
+    }
+  }
+}

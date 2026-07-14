@@ -43,6 +43,25 @@ func PlausibleISBN13(s string) bool {
 	return true
 }
 
+// ValidISBN13 additionally verifies the mod-10 check digit, so a transposed or
+// invented number is rejected before it costs a network round trip. Callers
+// routing a query (PlausibleISBN13) can stay lenient; callers asserting that a
+// specific ISBN is real should use this.
+func ValidISBN13(s string) bool {
+	if !PlausibleISBN13(s) {
+		return false
+	}
+	sum := 0
+	for i, r := range s {
+		weight := 1
+		if i%2 == 1 {
+			weight = 3
+		}
+		sum += weight * int(r-'0')
+	}
+	return sum%10 == 0
+}
+
 // AuthorsMatch reports whether two author strings plausibly name the same
 // person. It requires the surname to agree and the leading given name to match
 // or be an initial of the other, tolerating middle names and initials
