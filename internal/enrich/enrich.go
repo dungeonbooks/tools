@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dungeonbooks/tools/internal/bookmeta"
+	"github.com/dungeonbooks/tools/internal/clierr"
 )
 
 const (
@@ -56,7 +57,7 @@ func (s *Service) Book(ctx context.Context, query, source string) (bookmeta.Book
 		return s.auto(ctx, query, isbn)
 	case SourceHardcover:
 		if !s.hc.Enabled() {
-			return bookmeta.Book{}, errors.New("hardcover source unavailable: set HARDCOVER_API_TOKEN")
+			return bookmeta.Book{}, clierr.Auth(errors.New("hardcover source unavailable: set HARDCOVER_API_TOKEN"))
 		}
 		if isbn != "" {
 			return s.hc.ByISBN(ctx, isbn)
@@ -67,7 +68,7 @@ func (s *Service) Book(ctx context.Context, query, source string) (bookmeta.Book
 	case SourceOpenLibrary:
 		return single(ctx, s.ol, query, isbn)
 	default:
-		return bookmeta.Book{}, fmt.Errorf("unknown source %q (use hardcover, google, or openlibrary)", source)
+		return bookmeta.Book{}, clierr.Usage(fmt.Errorf("unknown source %q (use hardcover, google, or openlibrary)", source))
 	}
 }
 

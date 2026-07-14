@@ -1,0 +1,18 @@
+{
+  "source": "fake",
+  "candidates": [
+    {
+      "title": "The Will of the Many",
+      "author": "James Islington",
+      "isbn13": "9781982141172",
+      "why_trending": "Surging on BookTok for its hard-magic academy setting and twist-heavy plotting that readers keep reposting.",
+      "source_url": "https://example.com/will-of-the-many",
+      "discovered_at": "0001-01-01T00:00:00Z"
+    },
+    {
+      "title": "A Sorceress Comes to Call",
+      "author": "T. Kingfisher",
+      "discovered_at": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

@@ -12,8 +12,24 @@ Marty — the bookseller's wizard, as a Go CLI. Internal tooling for Dungeon Boo
 | `marty mcp` | Serve book lookup as MCP tools over stdio (for agents) |
 
 An ISBN argument looks the book up directly; anything else is treated as a search phrase.
-Add `--json` for machine-readable output, or `--source hardcover|google|openlibrary` to
-force a single source (default merges all three).
+Use `--source hardcover|google|openlibrary` to force a single source (default merges all three).
+
+## Output
+
+Output is **agent-native by default**: a terminal gets human-readable tables, a pipe gets
+JSON. Force either way with `--json` / `--json=false` regardless of where stdout points.
+
+Exit codes are typed so scripts and agents can branch without parsing stderr:
+
+| Code | Meaning |
+|---|---|
+| `0` | success |
+| `1` | unclassified error |
+| `2` | usage (bad flag or argument) |
+| `3` | not found |
+| `4` | auth (missing or rejected credentials) |
+| `5` | upstream (provider returned an error) |
+| `7` | rate limited |
 
 ## Resolving
 
@@ -31,14 +47,24 @@ marty resolve --isbn 9780262542951        # verify an ISBN you were handed
 **Always pass `--author`.** A bare title mismatches badly: "Playing at the World" on its
 own resolves to *King Lear*, "Unboxed" to a Dr. Seuss box set.
 
-The exit code is the contract: `0` is a verified match, `1` means nothing cleared the
-confidence floor. On an exit-1 the ISBN, if any, is a rejected best guess — never use it.
-Some books are in none of the sources, and unverified is the correct answer for those.
+The exit code is the contract, and it distinguishes the two ways a lookup comes back
+empty:
 
-A failed lookup is reported separately (`LOOKUP FAILED`, and `retryable: true` in JSON).
+| Code | Meaning | What to do |
+|---|---|---|
+| `0` | verified | the ISBN on stdout is this book's |
+| `3` | not found | nothing cleared the confidence floor, or no catalogue carries the book. There is no ISBN to give — say so rather than inventing one |
+| `5` | upstream | the lookup itself failed. This says nothing about the book; retry |
+
 A rate-limited provider and a book that no catalogue carries both come back empty, but
-"retry" and "this book has no ISBN" are opposite instructions — so they are never
-conflated. If you see `retryable`, call again before concluding anything about the book.
+"retry" and "this book has no ISBN" are opposite instructions, so they never share a code.
+In JSON the same split is `retryable: true` vs `verified: false`.
+
+**A rejected ISBN is never presented as the answer.** In human output it isn't printed at
+all — the reason goes to stderr and stdout stays empty. In JSON it *is* present, because a
+caller asking for structured data wants the candidate it can inspect, but it sits behind
+`"verified": false` and the exit code already said the lookup failed. Branch on `verified`
+(or on the exit code), never on the presence of `isbn13`.
 
 How a match is verified: the returned title is scored against what was asked for (token
 overlap on both the full title and the title with any subtitle stripped, so a subtitled

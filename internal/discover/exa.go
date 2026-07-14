@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/dungeonbooks/tools/internal/clierr"
 )
 
 const (
@@ -63,7 +65,7 @@ func (e *Exa) Enabled() bool { return e.key != "" }
 
 func (e *Exa) Trending(ctx context.Context, query, typ string, count int) ([]Candidate, error) {
 	if !e.Enabled() {
-		return nil, fmt.Errorf("exa source unavailable: set EXA_API_KEY")
+		return nil, clierr.Auth(fmt.Errorf("exa source unavailable: set EXA_API_KEY"))
 	}
 	if query == "" {
 		query = defaultQuery
@@ -95,7 +97,15 @@ func (e *Exa) Trending(ctx context.Context, query, typ string, count int) ([]Can
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("exa: status %s", resp.Status)
+		err := fmt.Errorf("exa: status %s", resp.Status)
+		switch resp.StatusCode {
+		case http.StatusTooManyRequests:
+			return nil, clierr.RateLimited(err)
+		case http.StatusUnauthorized, http.StatusForbidden:
+			return nil, clierr.Auth(err)
+		default:
+			return nil, clierr.Upstream(err)
+		}
 	}
 	var raw struct {
 		Answer struct {

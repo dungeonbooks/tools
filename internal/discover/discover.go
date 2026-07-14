@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dungeonbooks/tools/internal/clierr"
 )
 
 const (
@@ -98,7 +100,7 @@ func (s *Service) Trending(ctx context.Context, query, source, typ string, count
 		typ = TypeAuto
 	}
 	if !validType(typ) {
-		return nil, "", fmt.Errorf("unknown type %q (available: %s)", typ, strings.Join(searchTypes, ", "))
+		return nil, "", clierr.Usage(fmt.Errorf("unknown type %q (available: %s)", typ, strings.Join(searchTypes, ", ")))
 	}
 	if count <= 0 {
 		count = defaultCount
@@ -168,12 +170,12 @@ func (s *Service) pick(source string) (Provider, error) {
 		for _, p := range s.providers {
 			if p.Name() == source {
 				if !p.Enabled() {
-					return nil, fmt.Errorf("%s source unavailable", source)
+					return nil, clierr.Auth(fmt.Errorf("%s source unavailable", source))
 				}
 				return p, nil
 			}
 		}
-		return nil, fmt.Errorf("unknown source %q (available: %s)", source, strings.Join(s.names(), ", "))
+		return nil, clierr.Usage(fmt.Errorf("unknown source %q (available: %s)", source, strings.Join(s.names(), ", ")))
 	}
 	// Auto-pick never falls back to the Fake fixture: it returns invented books,
 	// which must not masquerade as real discovery. Fake is reachable only via an
@@ -186,7 +188,7 @@ func (s *Service) pick(source string) (Provider, error) {
 			return p, nil
 		}
 	}
-	return nil, errors.New("no discovery provider available: set EXA_API_KEY or pass --source fake")
+	return nil, clierr.Auth(errors.New("no discovery provider available: set EXA_API_KEY or pass --source fake"))
 }
 
 func (s *Service) Providers() []Provider { return s.providers }
