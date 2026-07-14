@@ -21,6 +21,10 @@ const (
 	defaultCount = 10
 )
 
+// searchTypes is the set of valid --type values, used both to validate input and
+// to render a helpful "available: ..." error, mirroring how source is checked.
+var searchTypes = []string{TypeAuto, TypeNeural, TypeKeyword}
+
 // Candidate is a trending book surfaced by discovery. ISBN13 is resolved later
 // (web-buzz results rarely carry ISBNs), so it stays empty here.
 type Candidate struct {
@@ -77,47 +81,63 @@ func (s *Service) WithResolver(r ISBNResolver) *Service {
 	return s
 }
 
-// New builds the default service. With an Exa key the real paid provider is
-// first (preferred); otherwise the service degrades to Fake so dev/tests run
-// offline with no credit spend.
+// New builds the default service with the real Exa provider plus the offline
+// Fake fixture. Auto-pick uses Exa (when a key is set) and never silently falls
+// back to Fake; Fake is selectable only via an explicit --source fake.
 func New(exaKey string) *Service {
 	hc := &http.Client{Timeout: 30 * time.Second}
 	exa := NewExa(exaKey, hc)
 	return NewService(exa, NewFake())
 }
 
-func (s *Service) Trending(ctx context.Context, query, source, typ string, count int, refresh bool) ([]Candidate, error) {
+// Trending returns candidates plus the name of the provider that served them, so
+// callers can label provenance (notably the Fake fixture, which must never be
+// mistaken for real results).
+func (s *Service) Trending(ctx context.Context, query, source, typ string, count int, refresh bool) ([]Candidate, string, error) {
 	if typ == "" {
 		typ = TypeAuto
+	}
+	if !validType(typ) {
+		return nil, "", fmt.Errorf("unknown type %q (available: %s)", typ, strings.Join(searchTypes, ", "))
 	}
 	if count <= 0 {
 		count = defaultCount
 	}
 	p, err := s.pick(source)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	key := cacheKey(p.Name(), typ, query, count)
+	src := p.Name()
+	key := cacheKey(src, typ, query, count)
 	if s.cache != nil && !refresh {
 		if cs, ok, err := s.cache.Get(key); err != nil {
-			return nil, err
+			return nil, src, err
 		} else if ok {
-			return cs, nil
+			return cs, src, nil
 		}
 	}
 	cs, err := p.Trending(ctx, query, typ, count)
 	if err != nil {
-		return nil, err
+		return nil, src, err
 	}
 	if s.resolver != nil {
 		s.resolveISBNs(ctx, cs)
 	}
 	if s.cache != nil {
 		if err := s.cache.Put(key, cs); err != nil {
-			return nil, err
+			return nil, src, err
 		}
 	}
-	return cs, nil
+	return cs, src, nil
+}
+
+func validType(typ string) bool {
+	for _, t := range searchTypes {
+		if t == typ {
+			return true
+		}
+	}
+	return false
 }
 
 // resolveISBNs fills empty ISBNs in place, concurrently and bounded. Lookup
@@ -155,12 +175,18 @@ func (s *Service) pick(source string) (Provider, error) {
 		}
 		return nil, fmt.Errorf("unknown source %q (available: %s)", source, strings.Join(s.names(), ", "))
 	}
+	// Auto-pick never falls back to the Fake fixture: it returns invented books,
+	// which must not masquerade as real discovery. Fake is reachable only via an
+	// explicit --source fake.
 	for _, p := range s.providers {
+		if p.Name() == SourceFake {
+			continue
+		}
 		if p.Enabled() {
 			return p, nil
 		}
 	}
-	return nil, errors.New("no discovery provider available")
+	return nil, errors.New("no discovery provider available: set EXA_API_KEY or pass --source fake")
 }
 
 func (s *Service) Providers() []Provider { return s.providers }

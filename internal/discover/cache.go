@@ -26,6 +26,9 @@ func OpenCache(path string) (*Cache, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Create tables, then migrate (older DBs need the total_micros column added),
+	// then seed the singleton usage row. The seed lists only id so it never
+	// references a column the migration is responsible for adding.
 	if _, err := db.Exec(`
 CREATE TABLE IF NOT EXISTS trending_cache (
 	key         TEXT PRIMARY KEY,
@@ -33,16 +36,68 @@ CREATE TABLE IF NOT EXISTS trending_cache (
 	created_at  INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS exa_usage (
-	id          INTEGER PRIMARY KEY CHECK (id = 1),
-	total_cents INTEGER NOT NULL DEFAULT 0,
-	calls       INTEGER NOT NULL DEFAULT 0
+	id           INTEGER PRIMARY KEY CHECK (id = 1),
+	total_micros INTEGER NOT NULL DEFAULT 0,
+	calls        INTEGER NOT NULL DEFAULT 0
 );
-INSERT OR IGNORE INTO exa_usage (id, total_cents, calls) VALUES (1, 0, 0);
 `); err != nil {
 		db.Close()
 		return nil, err
 	}
+	if err := migrateUsageToMicros(db); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if _, err := db.Exec(`INSERT OR IGNORE INTO exa_usage (id) VALUES (1)`); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return &Cache{db: db}, nil
+}
+
+// migrateUsageToMicros upgrades caches created with the original cents-based
+// column. Cents rounded every sub-half-cent call to zero, so small Exa charges
+// vanished from the lifetime total; micro-dollars hold the real per-call price.
+func migrateUsageToMicros(db *sql.DB) error {
+	rows, err := db.Query(`PRAGMA table_info(exa_usage)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	var hasCents, hasMicros bool
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull, pk int
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		switch name {
+		case "total_cents":
+			hasCents = true
+		case "total_micros":
+			hasMicros = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if !hasCents {
+		return nil
+	}
+	if !hasMicros {
+		if _, err := db.Exec(`ALTER TABLE exa_usage ADD COLUMN total_micros INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+	}
+	if _, err := db.Exec(`UPDATE exa_usage SET total_micros = total_cents * 10000 WHERE total_micros = 0`); err != nil {
+		return err
+	}
+	// Dropping the legacy column is cosmetic; ignore failure on SQLite builds
+	// without DROP COLUMN support, since the backfilled total is what matters.
+	_, _ = db.Exec(`ALTER TABLE exa_usage DROP COLUMN total_cents`)
+	return nil
 }
 
 func (c *Cache) Close() error { return c.db.Close() }
@@ -90,19 +145,20 @@ func (c *Cache) Put(key string, cs []Candidate) error {
 	return err
 }
 
-// RecordSpend adds a paid call's cost (dollars) to the running total.
+// RecordSpend adds a paid call's cost (dollars) to the running total. Cost is
+// stored as micro-dollars so sub-cent charges accumulate exactly.
 func (c *Cache) RecordSpend(dollars float64) error {
-	cents := int(dollars*100 + 0.5)
-	_, err := c.db.Exec(`UPDATE exa_usage SET total_cents = total_cents + ?, calls = calls + 1 WHERE id = 1`, cents)
+	micros := int64(dollars*1e6 + 0.5)
+	_, err := c.db.Exec(`UPDATE exa_usage SET total_micros = total_micros + ?, calls = calls + 1 WHERE id = 1`, micros)
 	return err
 }
 
 // Usage reports cumulative Exa spend in dollars and call count.
 func (c *Cache) Usage() (dollars float64, calls int, err error) {
-	var cents int
-	err = c.db.QueryRow(`SELECT total_cents, calls FROM exa_usage WHERE id = 1`).Scan(&cents, &calls)
+	var micros int64
+	err = c.db.QueryRow(`SELECT total_micros, calls FROM exa_usage WHERE id = 1`).Scan(&micros, &calls)
 	if err != nil {
 		return 0, 0, err
 	}
-	return float64(cents) / 100.0, calls, nil
+	return float64(micros) / 1e6, calls, nil
 }

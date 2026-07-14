@@ -1,6 +1,7 @@
 package discover
 
 import (
+	"database/sql"
 	"path/filepath"
 	"testing"
 	"time"
@@ -72,6 +73,55 @@ func TestCacheRejectsExpiredEntries(t *testing.T) {
 	}
 	if n != 0 {
 		t.Fatalf("expected expired row to be deleted, found %d", n)
+	}
+}
+
+func TestCacheMigratesLegacyCentsSchema(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cache.db")
+
+	// Stand up a cache with the original cents-based schema, with spend already
+	// recorded, then reopen it through OpenCache to trigger the migration.
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`
+CREATE TABLE exa_usage (
+	id          INTEGER PRIMARY KEY CHECK (id = 1),
+	total_cents INTEGER NOT NULL DEFAULT 0,
+	calls       INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO exa_usage (id, total_cents, calls) VALUES (1, 6, 3);
+`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+
+	c, err := OpenCache(path)
+	if err != nil {
+		t.Fatalf("open over legacy schema: %v", err)
+	}
+	defer c.Close()
+
+	dollars, calls, err := c.Usage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 3 {
+		t.Fatalf("expected 3 calls preserved, got %d", calls)
+	}
+	if dollars < 0.0599 || dollars > 0.0601 {
+		t.Fatalf("expected migrated total ~0.06, got %.4f", dollars)
+	}
+
+	// A sub-cent charge now accumulates exactly instead of rounding to zero.
+	if err := c.RecordSpend(0.003); err != nil {
+		t.Fatal(err)
+	}
+	dollars, _, _ = c.Usage()
+	if dollars < 0.0629 || dollars > 0.0631 {
+		t.Fatalf("expected ~0.063 after sub-cent spend, got %.4f", dollars)
 	}
 }
 

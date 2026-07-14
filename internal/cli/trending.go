@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,31 +31,42 @@ func trendingCmd() *cobra.Command {
 				svc.WithResolver(isbnResolver{enrich.New(cfg.HardcoverToken, cfg.GoogleBooksKey)})
 			}
 
+			// callSpend captures only what Exa billed for this invocation, so the
+			// cost line reflects this call, not the lifetime running total.
+			var callSpend float64
+			var cache *discover.Cache
 			if !noCache {
-				if cache, err := openTrendingCache(cfg); err == nil {
+				if c, err := openTrendingCache(cfg); err == nil {
+					cache = c
 					defer cache.Close()
 					svc.WithCache(cache)
-					if exa, ok := exaProvider(svc); ok {
-						exa.OnSpend(func(cost float64) {
-							if err := cache.RecordSpend(cost); err != nil {
-								fmt.Fprintf(os.Stderr, "marty: record spend: %v\n", err)
-							}
-						})
-					}
-					defer printUsage(cache, cmd)
 				} else {
-					fmt.Fprintf(os.Stderr, "marty: cache disabled: %v\n", err)
+					fmt.Fprintf(cmd.ErrOrStderr(), "marty: cache disabled: %v\n", err)
 				}
 			}
+			if exa, ok := exaProvider(svc); ok {
+				exa.OnSpend(func(cost float64) {
+					callSpend += cost
+					if cache != nil {
+						if err := cache.RecordSpend(cost); err != nil {
+							fmt.Fprintf(cmd.ErrOrStderr(), "marty: record spend: %v\n", err)
+						}
+					}
+				})
+			}
 
-			cs, err := svc.Trending(cmd.Context(), query, source, typ, count, refresh)
+			cs, src, err := svc.Trending(cmd.Context(), query, source, typ, count, refresh)
 			if err != nil {
 				return err
 			}
-			return renderTrending(cmd.OutOrStdout(), cs, jsonOut)
+			if err := renderTrending(cmd.OutOrStdout(), cs, src, jsonOut); err != nil {
+				return err
+			}
+			reportSpend(cmd.ErrOrStderr(), cache, callSpend)
+			return nil
 		},
 	}
-	c.Flags().StringVar(&source, "source", "", "force one source: fake or exa (default: first available)")
+	c.Flags().StringVar(&source, "source", "", "force one source: exa or fake (default: exa when EXA_API_KEY is set)")
 	c.Flags().StringVar(&typ, "type", "auto", "search mode: auto, neural, or keyword")
 	c.Flags().IntVar(&count, "count", 10, "max results")
 	c.Flags().BoolVar(&refresh, "refresh", false, "bypass the cache for this call")
@@ -88,12 +100,21 @@ func openTrendingCache(cfg config.Config) (*discover.Cache, error) {
 	return discover.OpenCache(path)
 }
 
-func printUsage(cache *discover.Cache, cmd *cobra.Command) {
-	dollars, calls, err := cache.Usage()
-	if err != nil {
+// reportSpend prints the cost of paid Exa work done in this call, and only then.
+// A cache hit, the Fake source, or a failure before any paid call all leave
+// callSpend at zero, so nothing prints. When a cache is present the lifetime
+// total is appended for credit-burn awareness.
+func reportSpend(w io.Writer, cache *discover.Cache, callSpend float64) {
+	if callSpend <= 0 {
 		return
 	}
-	fmt.Fprintf(os.Stderr, "Exa spend: $%.2f across %d call(s)\n", dollars, calls)
+	line := fmt.Sprintf("Exa: $%.4f this call", callSpend)
+	if cache != nil {
+		if dollars, calls, err := cache.Usage(); err == nil {
+			line += fmt.Sprintf(" · $%.4f total across %d call(s)", dollars, calls)
+		}
+	}
+	fmt.Fprintln(w, line)
 }
 
 func exaProvider(svc *discover.Service) (*discover.Exa, bool) {
