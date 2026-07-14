@@ -46,9 +46,17 @@ reliable; treat a low `confidence` as a maybe.
    keeping the best hit.
 4. Below the confidence floor (0.60) → marked `verified: false`, exit 1.
 
-Some books are in **no** source (e.g. "Playing Place" by Chad Randl was absent
-from Hardcover). Those come back unverified — that's the correct answer, not a
-bug. Report it rather than substituting a wrong ISBN.
+A book missing from one source is usually present in another, which is what the
+fallback is for. "Playing Place" by Chad Randl is the example: Hardcover has no
+record and hands back an unrelated romance novel, while Google Books has it
+(9780262047838), so the fallback finds it and the romance novel is scored away.
+
+If a book really is in **no** source, it comes back unverified — that's the
+correct answer, not a bug. Report it rather than substituting a wrong ISBN.
+
+**Caveat:** a failed lookup is currently reported the same way as an absent
+book. A rate-limited or unreachable provider yields "no result", which reads as
+"this book does not exist". Retry before concluding a book is unfindable.
 
 ## Setup (per machine)
 
